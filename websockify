@@ -83,7 +83,7 @@ Traffic Legend:
         websocket.WebSocketServer.__init__(self, *args, **kwargs)
 
     def run_wrap_cmd(self):
-        print("Starting '%s'" % " ".join(self.wrap_cmd))
+        self.log.info("Starting '%s'" % " ".join(self.wrap_cmd))
         self.wrap_times.append(time.time())
         self.wrap_times.pop(0)
         self.cmd = subprocess.Popen(
@@ -97,26 +97,14 @@ Traffic Legend:
         # Need to call wrapped command after daemonization so we can
         # know when the wrapped command exits
         if self.wrap_cmd:
-            dst_string = "'%s' (port %s)" % (" ".join(self.wrap_cmd), self.target_port)
-        elif self.unix_target:
-            dst_string = self.unix_target
-        else:
-            dst_string = "%s:%s" % (self.target_host, self.target_port)
-
-        if self.target_cfg:
-            msg = "  - proxying from %s:%s to targets in %s" % (
-                self.listen_host, self.listen_port, self.target_cfg)
-        else:
-            msg = "  - proxying from %s:%s to %s" % (
-                self.listen_host, self.listen_port, dst_string)
-
-        if self.ssl_target:
-            msg += " (using SSL)"
-
-        print(msg + "\n")
-
-        if self.wrap_cmd:
+            self.log.info("  - proxying from %s:%s to '%s' (port %s)" % (
+                    self.listen_host, self.listen_port,
+                    " ".join(self.wrap_cmd), self.target_port))
             self.run_wrap_cmd()
+        else:
+            self.log.info("  - proxying from %s:%s to %s:%s" % (
+                    self.listen_host, self.listen_port,
+                    self.target_host, self.target_port))
 
     def poll(self):
         # If we are wrapping a command, check it's status
@@ -139,7 +127,7 @@ Traffic Legend:
                 if (now - avg) < 10:
                     # 3 times in the last 10 seconds
                     if self.spawn_message:
-                        print("Command respawning too fast")
+                        self.log.error("Command respawning too fast")
                         self.spawn_message = False
                 else:
                     self.run_wrap_cmd()
@@ -180,7 +168,7 @@ Traffic Legend:
                 connect=True, use_ssl=self.ssl_target, unix_socket=self.unix_target)
 
         if self.verbose and not self.daemon:
-            print(self.traffic_legend)
+            self.log.debug(self.traffic_legend)
 
         # Start proxying
         try:
@@ -299,6 +287,11 @@ def websockify_init():
     parser = optparse.OptionParser(usage=usage)
     parser.add_option("--verbose", "-v", action="store_true",
             help="verbose messages and per frame traffic")
+    parser.add_option("--logfile", "-l", default=None,
+            help="log output to logfile", metavar="LOGFILE")
+    parser.add_option("--loglevel", "-L", default='4',
+            help="set loglevel 0-5 for none to debug",
+            metavar="LOGLEVEL")
     parser.add_option("--record",
             help="record sessions to FILE.[session_number]", metavar="FILE")
     parser.add_option("--daemon", "-D",
