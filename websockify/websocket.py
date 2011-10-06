@@ -17,6 +17,7 @@ as taken from http://docs.python.org/dev/library/ssl.html#certificates
 '''
 
 import os, sys, time, errno, signal, socket, traceback, select
+import warnings, logging
 import array, struct
 from base64 import b64encode, b64decode
 
@@ -144,7 +145,7 @@ Sec-WebSocket-Accept: %s\r
             '5': logging.DEBUG,
         }
         if int(loglevel) > 5: loglevel = 5
-            
+
         logformat = '%(asctime)s %(levelname)s, %(message)s'
         if logfile == None:
             logging.basicConfig(format=logformat)
