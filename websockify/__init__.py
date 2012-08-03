@@ -16,6 +16,7 @@ from select import select
 import websocket
 try:    from urllib.parse import parse_qs, urlparse
 except: from urlparse import parse_qs, urlparse
+import logging
 
 class WebSocketProxy(websocket.WebSocketServer):
     """
@@ -39,6 +40,7 @@ Traffic Legend:
     <. - Client send partial
 """
 
+    #noinspection PyUnresolvedReferences
     def __init__(self, *args, **kwargs):
         # Save off proxy specific options
         self.target_host    = kwargs.pop('target_host')
@@ -50,7 +52,11 @@ Traffic Legend:
         self.target_cfg     = kwargs.pop('target_cfg')
         # Last 3 timestamps command was run
         self.wrap_times    = [0, 0, 0]
+        self.loglevel       = kwargs.pop('loglevel')
+        self.logfile        = kwargs.pop('logfile')
 
+
+        self.open_log()
         if self.wrap_cmd:
             rebinder_path = ['./', os.path.dirname(sys.argv[0])]
             self.rebinder = None
@@ -111,11 +117,11 @@ Traffic Legend:
 
         if self.wrap_cmd and self.cmd:
             ret = self.cmd.poll()
-            if ret != None:
-                self.vmsg("Wrapped command exited (or daemon). Returned %s" % ret)
+            if ret is not None:
+                self.log.debug("Wrapped command exited (or daemon). Returned %s" % ret)
                 self.cmd = None
 
-        if self.wrap_cmd and self.cmd == None:
+        if self.wrap_cmd and self.cmd is None:
             # Response to wrapped command being gone
             if self.wrap_mode == "ignore":
                 pass
@@ -162,7 +168,7 @@ Traffic Legend:
         
         if self.ssl_target:
             msg += " (using SSL)"
-        self.msg(msg)
+        self.log.info(msg)
 
         tsock = self.socket(self.target_host, self.target_port,
                 connect=True, use_ssl=self.ssl_target, unix_socket=self.unix_target)
@@ -177,7 +183,7 @@ Traffic Legend:
             if tsock:
                 tsock.shutdown(socket.SHUT_RDWR)
                 tsock.close()
-                self.vmsg("%s:%s: Closed target" %(
+                self.log.debug("%s:%s: Closed target" %(
                     self.target_host, self.target_port))
             raise
 
@@ -213,12 +219,35 @@ Traffic Legend:
                     ttoken, target = line.split(': ')
                     targets[ttoken] = target.strip()
 
-        self.vmsg("Target config: %s" % repr(targets))
+        self.log.debug("Target config: %s" % repr(targets))
 
         if targets.has_key(token):
             return targets[token].split(':')
         else:
             raise self.EClose("Token '%s' not found" % token)
+
+    def open_log(self):
+        # Handle logging
+        if not self.loglevel.isdigit:
+            raise Exception("Invalid loglevel specified, must be 0-5")
+
+        loglevels = {
+            '0': None,
+            '1': logging.CRITICAL,
+            '2': logging.ERROR,
+            '3': logging.WARNING,
+            '4': logging.INFO,
+            '5': logging.DEBUG,
+            }
+        if int(self.loglevel) > 5: self.loglevel = 5
+
+        logformat = '%(asctime)s %(levelname)s, %(message)s'
+        if self.logfile is None:
+            logging.basicConfig(format=logformat)
+        else:
+            logging.basicConfig(format=logformat, filename=self.logfile)
+        self.log = logging.getLogger('websocket')
+        self.log.setLevel(loglevels[self.loglevel])
 
     def do_proxy(self, target):
         """
@@ -252,10 +281,7 @@ Traffic Legend:
             if target in ins:
                 # Receive target data, encode it and queue for client
                 buf = target.recv(self.buffer_size)
-                if len(buf) == 0:
-                    self.vmsg("%s:%s: Target closed connection" %(
-                        self.target_host, self.target_port))
-                    raise self.CClose(1000, "Target closed")
+                if not len(buf): raise self.EClose("Target closed")
 
                 cqueue.append(buf)
                 self.traffic("{")
@@ -275,7 +301,7 @@ Traffic Legend:
 
                 if closed:
                     # TODO: What about blocking on client socket?
-                    self.vmsg("%s:%s: Client closed connection" %(
+                    self.log.debug("%s:%s: Client closed connection" %(
                         self.target_host, self.target_port))
                     raise self.CClose(closed['code'], closed['reason'])
 
