@@ -102,7 +102,7 @@ Sec-WebSocket-Accept: %s\r
     def __init__(self, listen_host='', listen_port=None, source_is_ipv6=False,
             verbose=False, cert='', key='', ssl_only=None,
             daemon=False, record='', web='', logfile=None, loglevel='4',
-            run_once=False, timeout=0):
+            run_once=False, timeout=0, idle_timeout=0):
 
         # settings
         self.verbose        = verbose
