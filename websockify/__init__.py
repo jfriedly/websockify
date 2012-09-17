@@ -243,10 +243,15 @@ Traffic Legend:
 
         logformat = '%(asctime)s %(levelname)s, %(message)s'
         if self.logfile is None:
-            logging.basicConfig(format=logformat)
+            handler = logging.StreamHandler()
         else:
-            logging.basicConfig(format=logformat, filename=self.logfile)
+            handler = logging.FileHandler(self.logfile)
+        handler.setLevel(loglevels[self.loglevel])
+        formatter = logging.Formatter(logformat)
+        handler.setFormatter(formatter)
+
         self.log = logging.getLogger('websocket')
+        self.log.addHandler(handler)
         self.log.setLevel(loglevels[self.loglevel])
 
     def do_proxy(self, target):
