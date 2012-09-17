@@ -133,26 +133,32 @@ Sec-WebSocket-Accept: %s\r
             os.chdir(self.web)
 
         # Handle logging
-        if loglevel.isdigit == False:
-            raise Exception("Invalid loglevel specified, must be 0-5")
+        if not getattr(self, 'log', None):
+            if loglevel.isdigit == False:
+                raise Exception("Invalid loglevel specified, must be 0-5")
 
-        log_levels = { 
-            '0': None,
-            '1': logging.CRITICAL,
-            '2': logging.ERROR,
-            '3': logging.WARNING,
-            '4': logging.INFO,
-            '5': logging.DEBUG,
-        }
-        if int(loglevel) > 5: loglevel = '5'
-            
-        logformat = '%(asctime)s %(levelname)s, %(message)s'
-        if logfile is None:
-            logging.basicConfig(format=logformat)
-        else:
-            logging.basicConfig(format=logformat, filename=logfile)
-        self.log = logging.getLogger('websocket')
-        self.log.setLevel(log_levels[loglevel])
+            log_levels = { 
+                '0': None,
+                '1': logging.CRITICAL,
+                '2': logging.ERROR,
+                '3': logging.WARNING,
+                '4': logging.INFO,
+                '5': logging.DEBUG,
+            }
+            if int(loglevel) > 5: loglevel = '5'
+                
+            logformat = '%(asctime)s %(levelname)s, %(message)s'
+            if logfile is None:
+                handler = logging.StreamHandler()
+            else:
+                handler = logging.FileHandler(logfile)
+            handler.setLevel(log_levels[loglevel])
+            formatter = logging.Formatter(logformat)
+            handler.setFormatter(formatter)
+    
+            self.log = logging.getLogger('websocket')
+            self.log.addHandler(handler)
+            self.log.setLevel(log_levels[loglevel])
 
         # Sanity checks
         if not ssl and self.ssl_only:
